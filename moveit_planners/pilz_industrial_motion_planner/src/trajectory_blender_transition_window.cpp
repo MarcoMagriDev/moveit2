@@ -272,23 +272,38 @@ bool pilz_industrial_motion_planner::TrajectoryBlenderTransitionWindow::searchIn
   Eigen::Isometry3d circ_pose = req.first_trajectory->getLastWayPoint().getFrameTransform(req.link_name);
 
   // Searh for intersection points according to distance
-  if (!linearSearchIntersectionPoint(req.link_name, circ_pose.translation(), req.blend_radius, req.first_trajectory,
-                                     true, first_interse_index))
+  double radius_decay = 0.001;
+  int attempts = 0;
+  int max_attempts = 1000;
+  bool first_interse_index_found = false;
+  bool second_interse_index_found = false;
+  double blend_radius = req.blend_radius;
+  while (attempts < max_attempts)
   {
-    RCLCPP_ERROR_STREAM(LOGGER, "Intersection point of first trajectory not found.");
-    return false;
-  }
-  RCLCPP_INFO_STREAM(LOGGER, "Intersection point of first trajectory found, index: " << first_interse_index);
+    first_interse_index_found = linearSearchIntersectionPoint(req.link_name, circ_pose.translation(), blend_radius,
+                                                              req.first_trajectory, true, first_interse_index);
+    second_interse_index_found = linearSearchIntersectionPoint(req.link_name, circ_pose.translation(), blend_radius,
+                                                               req.second_trajectory, false, second_interse_index);
+    if (first_interse_index_found && second_interse_index_found)
+    {
+      RCLCPP_ERROR_STREAM(LOGGER, "Intersections points found for radius: " << blend_radius);
+      RCLCPP_INFO_STREAM(LOGGER, "Intersection point of first trajectory found, index: " << first_interse_index);
+      RCLCPP_INFO_STREAM(LOGGER, "Intersection point of second trajectory found, index: " << second_interse_index);
+      return true;
+    }
+    /* RCLCPP_ERROR_STREAM(LOGGER, "Intersection point of second trajectory not found.");
+    RCLCPP_ERROR_STREAM(LOGGER, "Intersection point of first trajectory not found."); */
 
-  if (!linearSearchIntersectionPoint(req.link_name, circ_pose.translation(), req.blend_radius, req.second_trajectory,
-                                     false, second_interse_index))
-  {
-    RCLCPP_ERROR_STREAM(LOGGER, "Intersection point of second trajectory not found.");
-    return false;
+    if (blend_radius - radius_decay <= 0)
+    {
+      break;
+    }
+    blend_radius = blend_radius - radius_decay;
+    RCLCPP_WARN_STREAM(LOGGER, "Intersections points not found. Trying with radius: " << blend_radius);
+    attempts++;
   }
-
-  RCLCPP_INFO_STREAM(LOGGER, "Intersection point of second trajectory found, index: " << second_interse_index);
-  return true;
+  RCLCPP_WARN_STREAM(LOGGER, "Intersections points not found. Unable to blend the trajectory");
+  return false;
 }
 
 void pilz_industrial_motion_planner::TrajectoryBlenderTransitionWindow::determineTrajectoryAlignment(
