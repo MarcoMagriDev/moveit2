@@ -125,6 +125,19 @@ private:
   void checkForOverlappingRadii(const MotionResponseCont& resp_cont, const RadiiCont& radii) const;
 
   /**
+   * @brief Adjust blending radii for two consecutive in case of provided overlapping blending radii.
+   * Prints warning in case of adjustments.
+   *
+   * @param motion_plan_responses Container of calculated/generated
+   * trajectories.
+   * @param radii Container stating the blend radii.
+   * @param radii_decay Amount removed to each consecutive overlapping blening radius at each iteration.
+   * @param max_attempts Maximum number of attempts for each adjustment.
+   */
+  void adjustForOverlappingRadii(const MotionResponseCont& resp_cont, RadiiCont& radii,
+                                 const double& radii_decay = 0.001, const int& max_attempts = 1000) const;
+
+  /**
    * @brief Solve each sequence item individually.
    *
    * @param planning_scene The planning_scene to be used for trajectory

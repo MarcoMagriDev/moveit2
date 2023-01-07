@@ -299,7 +299,6 @@ bool pilz_industrial_motion_planner::TrajectoryBlenderTransitionWindow::searchIn
       break;
     }
     blend_radius = blend_radius - radius_decay;
-    RCLCPP_WARN_STREAM(LOGGER, "Intersections points not found. Trying with radius: " << blend_radius);
     attempts++;
   }
   RCLCPP_WARN_STREAM(LOGGER, "Intersections points not found. Unable to blend the trajectory");

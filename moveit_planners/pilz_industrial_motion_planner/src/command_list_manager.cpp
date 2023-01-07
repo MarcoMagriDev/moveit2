@@ -94,6 +94,7 @@ RobotTrajCont CommandListManager::solve(const planning_scene::PlanningSceneConst
 
   assert(model_);
   RadiiCont radii{ extractBlendRadii(*model_, req_list) };
+  adjustForOverlappingRadii(resp_cont, radii);
   checkForOverlappingRadii(resp_cont, radii);
 
   plan_comp_builder_.reset();
@@ -151,6 +152,47 @@ void CommandListManager::checkForOverlappingRadii(const MotionResponseCont& resp
       os << "Overlapping blend radii between command [" << i << "] and [" << i + 1 << "].";
       throw OverlappingBlendRadiiException(os.str());
     }
+  }
+}
+
+void CommandListManager::adjustForOverlappingRadii(const MotionResponseCont& resp_cont, RadiiCont& radii,
+                                                   const double& radii_decay, const int& max_attempts) const
+{
+  if (resp_cont.empty())
+  {
+    return;
+  }
+  if (resp_cont.size() < 3)
+  {
+    return;
+  }
+
+  int attempts = 0;
+  RadiiCont radii_backup{ radii };
+  for (MotionResponseCont::size_type i = 0; i < resp_cont.size() - 2; ++i)
+  {
+    attempts = 0;
+    while (attempts < max_attempts)
+    {
+      if (!checkRadiiForOverlap(*(resp_cont.at(i).trajectory_), radii.at(i), *(resp_cont.at(i + 1).trajectory_),
+                                radii.at(i + 1)))
+        break;
+      if (radii.at(i + 1) >= radii_decay)
+        radii.at(i + 1) -= radii_decay / 2;
+      if (radii.at(i) >= radii_decay)
+        radii.at(i) -= radii_decay / 2;
+      if (radii.at(i + 1) < radii_decay && radii.at(i) < radii_decay)
+        break;
+      attempts++;
+    }
+  }
+
+  for (size_t i = 0; i < radii.size(); i++)
+  {
+    if (radii[i] == radii_backup[i])
+      continue;
+    RCLCPP_WARN_STREAM(LOGGER,
+                       "Blending radius of target " << i << " reduced from " << radii_backup[i] << " to " << radii[i]);
   }
 }
 
