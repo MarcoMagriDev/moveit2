@@ -200,6 +200,9 @@ ServoCalcs::ServoCalcs(const rclcpp::Node::SharedPtr& node,
                 "calculations instead.",
                 joint_model_group_->getName().c_str());
   }
+
+  directional_collision_checker_ =
+      std::make_shared<DirectionalCollisionChecker>(node, parameters_, planning_scene_monitor_);
 }
 
 ServoCalcs::~ServoCalcs()
@@ -679,8 +682,21 @@ bool ServoCalcs::internalServoUpdate(Eigen::ArrayXd& delta_theta,
   // Set internal joint state from original
   internal_joint_state_ = original_joint_state_;
 
-  // Apply collision scaling
-  double collision_scale = collision_velocity_scale_;
+  // Brutally disabling standard collision checking
+  double collision_scale = 1.0;
+  // Compute the delta_x from delta_theta using jacobian
+  Eigen::MatrixXd jacobian = current_state_->getJacobian(joint_model_group_);
+  Eigen::VectorXd delta_x = jacobian * Eigen::VectorXd::Map(delta_theta.data(), delta_theta.size());
+  // Update delta_x based on collision distances
+  directional_collision_checker_->update_delta_x(delta_x);
+
+  // Compute back delta_theta from the scaled delta_x using jacobian pinv
+  Eigen::JacobiSVD<Eigen::MatrixXd> svd =
+      Eigen::JacobiSVD<Eigen::MatrixXd>(jacobian, Eigen::ComputeThinU | Eigen::ComputeThinV);
+  Eigen::MatrixXd matrix_s = svd.singularValues().asDiagonal();
+  Eigen::MatrixXd pseudo_inverse = svd.matrixV() * matrix_s.inverse() * svd.matrixU().transpose();
+  delta_theta = pseudo_inverse * delta_x;
+
   if (collision_scale > 0 && collision_scale < 1)
   {
     status_ = StatusCode::DECELERATE_FOR_COLLISION;

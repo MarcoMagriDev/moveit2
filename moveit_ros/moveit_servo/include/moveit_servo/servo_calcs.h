@@ -66,6 +66,7 @@
 // moveit_servo
 #include <moveit_servo/servo_parameters.h>
 #include <moveit_servo/status_codes.h>
+#include <moveit_servo/directional_collision_checker.h>
 #include <moveit/online_signal_smoothing/smoothing_base_class.h>
 
 namespace moveit_servo
@@ -361,5 +362,7 @@ protected:
   kinematics::KinematicsBaseConstPtr ik_solver_;
   Eigen::Isometry3d ik_base_to_tip_frame_;
   bool use_inv_jacobian_ = false;
+
+  std::shared_ptr<DirectionalCollisionChecker> directional_collision_checker_;
 };
 }  // namespace moveit_servo
