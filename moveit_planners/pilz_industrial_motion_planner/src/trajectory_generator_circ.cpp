@@ -215,8 +215,8 @@ void TrajectoryGeneratorCIRC::plan(const planning_scene::PlanningSceneConstPtr& 
 
   moveit_msgs::msg::MoveItErrorCodes error_code;
   std::vector<double> time_samples;
-  compute_time_samples(cart_trajectory, interpolation_params, time_samples);
-  if (!generateJointTrajectory(scene, planner_limits_.getJointLimitContainer(), cart_trajectory, plan_info.group_name,
+  if (!computeTimeSamples(cart_trajectory, interpolation_params, time_samples) ||
+      !generateJointTrajectory(scene, planner_limits_.getJointLimitContainer(), cart_trajectory, plan_info.group_name,
                                plan_info.link_name, plan_info.start_joint_position, time_samples, joint_trajectory,
                                error_code))
   {

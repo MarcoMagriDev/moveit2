@@ -113,8 +113,17 @@ bool verifySampleJointLimits(const std::map<std::string, double>& position_last,
                              const std::map<std::string, double>& position_current, double duration_last,
                              double duration_current, const JointLimitsContainer& joint_limits);
 
-void compute_time_samples(const KDL::Trajectory& trajectory, const interpolation::Params& interpolation_params,
-                          std::vector<double>& time_samples, double time_step = 0.001);
+/**
+ * @brief Compute time samples for a given trajectory based on interpolation parameters.
+ *
+ * @param trajectory The input KDL trajectory.
+ * @param interpolation_params Parameters for interpolation.
+ * @param time_samples Output vector of time samples.
+ * @param time_step The time step for sampling.
+ * @return true if time samples are successfully computed, false otherwise.
+ */
+bool computeTimeSamples(const KDL::Trajectory& trajectory, const interpolation::Params& interpolation_params,
+                        std::vector<double>& time_samples, double time_step = 0.001);
 
 /**
  * @brief Interpolates between two poses.

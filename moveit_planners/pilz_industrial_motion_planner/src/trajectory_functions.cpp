@@ -215,9 +215,9 @@ void pilz_industrial_motion_planner::interpolate(const Eigen::Isometry3d& start_
   interpolated_pose.linear() = quat1.slerp(interpolation_factor, quat2).toRotationMatrix();
 }
 
-void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory& trajectory,
-                                                          const interpolation::Params& interpolation_params,
-                                                          std::vector<double>& time_samples, double time_step)
+bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& trajectory,
+                                                        const interpolation::Params& interpolation_params,
+                                                        std::vector<double>& time_samples, double time_step)
 {
   time_samples.clear();
 
@@ -229,7 +229,7 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
   if (traj_duration <= 1e-06)
   {
     time_samples.push_back(0.0);
-    return;
+    return true;
   }
 
   // Get the initial position
@@ -259,7 +259,8 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
   {
     if (total_translation_distance < interpolation_params.min_translation_interpolation_distance)
     {
-      RCLCPP_DEBUG(getLogger(), "Translation distance is too small, set to minimum value to ensure no numerical errors.");
+      RCLCPP_DEBUG(getLogger(),
+                   "Translation distance is too small, set to minimum value to ensure no numerical errors.");
       target_translation_distance = 1e-06;
     }
   }
@@ -316,6 +317,8 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
     time_samples.push_back(traj_duration);
   }
   // std::chrono::duration<double, std::milli> execution_time = std::chrono::high_resolution_clock::now() - start_time;
+
+  return true;
 }
 
 bool pilz_industrial_motion_planner::generateJointTrajectory(
@@ -385,8 +388,6 @@ bool pilz_industrial_motion_planner::generateJointTrajectory(
         !verifySampleJointLimits(ik_solution_last, joint_velocity_last, ik_solution, duration_last_sample,
                                  duration_current_sample, joint_limits))
     {
-      std::cout << "Duration current sample: " << duration_current_sample << std::endl;
-      std::cout << "Duration last sample: " << duration_last_sample << std::endl;
       RCLCPP_ERROR_STREAM(getLogger(), "Inverse kinematics solution at "
                                            << *time_iter
                                            << "s violates the joint velocity/acceleration/deceleration limits.");
@@ -600,8 +601,8 @@ bool pilz_industrial_motion_planner::isRobotStateEqual(const moveit::core::Robot
 
   if ((joint_position_1 - joint_position_2).norm() > epsilon)
   {
-    RCLCPP_INFO_STREAM(getLogger(), "Joint positions of the two states are different. state1: "
-                                        << joint_position_1 << " state2: " << joint_position_2);
+    RCLCPP_DEBUG_STREAM(getLogger(), "Joint positions of the two states are different. state1: "
+                                         << joint_position_1 << " state2: " << joint_position_2);
     return false;
   }
 
@@ -612,8 +613,8 @@ bool pilz_industrial_motion_planner::isRobotStateEqual(const moveit::core::Robot
 
   if ((joint_velocity_1 - joint_velocity_2).norm() > epsilon)
   {
-    RCLCPP_INFO_STREAM(getLogger(), "Joint velocities of the two states are different. state1: "
-                                        << joint_velocity_1 << " state2: " << joint_velocity_2);
+    RCLCPP_DEBUG_STREAM(getLogger(), "Joint velocities of the two states are different. state1: "
+                                         << joint_velocity_1 << " state2: " << joint_velocity_2);
     return false;
   }
 
@@ -624,8 +625,8 @@ bool pilz_industrial_motion_planner::isRobotStateEqual(const moveit::core::Robot
 
   if ((joint_acc_1 - joint_acc_2).norm() > epsilon)
   {
-    RCLCPP_INFO_STREAM(getLogger(), "Joint accelerations of the two states are different. state1: "
-                                        << joint_acc_1 << " state2: " << joint_acc_2);
+    RCLCPP_DEBUG_STREAM(getLogger(), "Joint accelerations of the two states are different. state1: "
+                                         << joint_acc_1 << " state2: " << joint_acc_2);
     return false;
   }
 
