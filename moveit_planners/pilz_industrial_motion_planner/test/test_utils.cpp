@@ -1300,6 +1300,13 @@ void testutils::checkRobotModel(const moveit::core::RobotModelConstPtr& robot_mo
   // Check that acceleration is monotonously decreasing
   if (!isMonotonouslyDecreasing(accelerations, acc_tol))
   {
+    // Print the accelerations
+    std::stringstream debug_stream;
+    for (auto acc : accelerations)
+    {
+      debug_stream << acc << '\n';
+    }
+    std::cout << "Accelerations: " << debug_stream.str() << std::endl;
     return ::testing::AssertionFailure() << "Cannot be a trapezoid since "
                                             "acceleration is not monotonously "
                                             "decreasing!";

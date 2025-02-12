@@ -51,6 +51,7 @@
 #include <pilz_industrial_motion_planner/cartesian_trajectory.hpp>
 #include <pilz_industrial_motion_planner/limits_container.hpp>
 #include <pilz_industrial_motion_planner/trajectory_generation_exceptions.hpp>
+#include <pilz_industrial_motion_planner/interpolation_parameters.hpp>
 
 namespace pilz_industrial_motion_planner
 {
@@ -112,6 +113,9 @@ bool verifySampleJointLimits(const std::map<std::string, double>& position_last,
                              const std::map<std::string, double>& position_current, double duration_last,
                              double duration_current, const JointLimitsContainer& joint_limits);
 
+void compute_time_samples(const KDL::Trajectory& trajectory, const interpolation::Params& interpolation_params,
+                          std::vector<double>& time_samples, double time_step = 0.001);
+
 /**
  * @brief Interpolates between two poses.
  *
@@ -146,8 +150,8 @@ void interpolate(const Eigen::Isometry3d& start_pose, const Eigen::Isometry3d& e
 bool generateJointTrajectory(const planning_scene::PlanningSceneConstPtr& scene,
                              const JointLimitsContainer& joint_limits, const KDL::Trajectory& trajectory,
                              const std::string& group_name, const std::string& link_name,
-                             const std::map<std::string, double>& initial_joint_position, double sampling_time,
-                             trajectory_msgs::msg::JointTrajectory& joint_trajectory,
+                             const std::map<std::string, double>& initial_joint_position,
+                             std::vector<double> time_samples, trajectory_msgs::msg::JointTrajectory& joint_trajectory,
                              moveit_msgs::msg::MoveItErrorCodes& error_code, bool check_self_collision = false);
 
 /**
@@ -166,6 +170,7 @@ bool generateJointTrajectory(const planning_scene::PlanningSceneConstPtr& scene,
                              const std::string& group_name, const std::string& link_name,
                              const std::map<std::string, double>& initial_joint_position,
                              const std::map<std::string, double>& initial_joint_velocity,
+                             const double& last_sample_duration,
                              trajectory_msgs::msg::JointTrajectory& joint_trajectory,
                              moveit_msgs::msg::MoveItErrorCodes& error_code, bool check_self_collision = false);
 

@@ -901,8 +901,16 @@ TEST_F(TrajectoryFunctionsTestFlangeAndGripper, testGenerateJointTrajectoryWithI
   moveit_msgs::msg::MoveItErrorCodes error_code;
   bool check_self_collision{ false };
 
+  // generate a vector of equally spaced time_samples
+  std::vector<double> time_samples;
+  for (double t = 0; t < kdl_trajectory.Duration(); t += sampling_time)
+  {
+    time_samples.push_back(t);
+  }
+  time_samples.push_back(kdl_trajectory.Duration());
+
   EXPECT_FALSE(pilz_industrial_motion_planner::generateJointTrajectory(
-      planning_scene_, joint_limits, kdl_trajectory, group_name, tcp_link_, initial_joint_position, sampling_time,
+      planning_scene_, joint_limits, kdl_trajectory, group_name, tcp_link_, initial_joint_position, time_samples,
       joint_trajectory, error_code, check_self_collision));
 
   std::map<std::string, double> initial_joint_velocity;
@@ -915,7 +923,7 @@ TEST_F(TrajectoryFunctionsTestFlangeAndGripper, testGenerateJointTrajectoryWithI
 
   EXPECT_FALSE(pilz_industrial_motion_planner::generateJointTrajectory(
       planning_scene_, joint_limits, cart_traj, group_name, tcp_link_, initial_joint_position, initial_joint_velocity,
-      joint_trajectory, error_code, check_self_collision));
+      0.1, joint_trajectory, error_code, check_self_collision));
 }
 
 /**

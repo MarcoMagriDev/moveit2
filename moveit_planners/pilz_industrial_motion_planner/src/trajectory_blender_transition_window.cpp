@@ -94,12 +94,13 @@ bool pilz_industrial_motion_planner::TrajectoryBlenderTransitionWindow::blend(
     initial_joint_velocity[joint_name] =
         req.first_trajectory->getWayPoint(first_intersection_index - 1).getVariableVelocity(joint_name);
   }
+  double duration_last_sample = req.first_trajectory->getWayPointDurationFromPrevious(first_intersection_index - 1);
   trajectory_msgs::msg::JointTrajectory blend_joint_trajectory;
   moveit_msgs::msg::MoveItErrorCodes error_code;
 
   if (!generateJointTrajectory(planning_scene, limits_.getJointLimitContainer(), blend_trajectory_cartesian,
                                req.group_name, req.link_name, initial_joint_position, initial_joint_velocity,
-                               blend_joint_trajectory, error_code))
+                               duration_last_sample, blend_joint_trajectory, error_code))
   {
     // LCOV_EXCL_START
     RCLCPP_INFO(getLogger(), "Failed to generate joint trajectory for blending trajectory.");
