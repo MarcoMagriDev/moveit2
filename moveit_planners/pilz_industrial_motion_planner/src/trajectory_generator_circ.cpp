@@ -214,17 +214,10 @@ void TrajectoryGeneratorCIRC::plan(const planning_scene::PlanningSceneConstPtr& 
   KDL::Trajectory_Segment cart_trajectory(cart_path.get(), vel_profile.get(), false);
 
   moveit_msgs::msg::MoveItErrorCodes error_code;
-  // sample the Cartesian trajectory and compute joint trajectory using inverse
-  // kinematics
-  auto cartesian_limits = planner_limits_.getCartesianLimits();
-  auto sampling_time = std::min({ interpolation_params.max_sample_time,
-                                  interpolation_params.max_translation_interpolation_distance /
-                                      (cartesian_limits.max_trans_vel * req.max_velocity_scaling_factor),
-                                  interpolation_params.max_rotation_interpolation_distance /
-                                      (cartesian_limits.max_rot_vel * req.max_velocity_scaling_factor) });
-  RCLCPP_DEBUG(getLogger(), "Sampling time for CIR command: %f", sampling_time);
-  if (!generateJointTrajectory(scene, planner_limits_.getJointLimitContainer(), cart_trajectory, plan_info.group_name,
-                               plan_info.link_name, plan_info.start_joint_position, sampling_time, joint_trajectory,
+  std::vector<double> time_samples;
+  if (!computeTimeSamples(cart_trajectory, interpolation_params, time_samples) ||
+      !generateJointTrajectory(scene, planner_limits_.getJointLimitContainer(), cart_trajectory, plan_info.group_name,
+                               plan_info.link_name, plan_info.start_joint_position, time_samples, joint_trajectory,
                                error_code))
   {
     throw CircTrajectoryConversionFailure("Failed to generate valid joint trajectory from the Cartesian path",

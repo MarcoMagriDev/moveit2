@@ -648,7 +648,7 @@ TEST_F(TrajectoryBlenderTransitionWindowTest, testNonLinearBlending)
     trajectory_msgs::msg::JointTrajectory joint_traj;
     const double duration{ lin_traj->getWayPointDurationFromStart(lin_traj->getWayPointCount()) };
     // time from start zero does not work
-    const double time_from_start_offset{ time_scaling_factor * lin_traj->getWayPointDurations().back() };
+    const double time_from_start_offset{ time_scaling_factor * lin_traj->getAverageSegmentDuration() };
 
     // generate modified cartesian trajectory
     for (size_t i = 0; i < lin_traj->getWayPointCount(); ++i)
@@ -692,10 +692,12 @@ TEST_F(TrajectoryBlenderTransitionWindowTest, testNonLinearBlending)
       }
     }
 
+    double duration_last_sample = cart_traj.points[1].time_from_start.seconds();
+
     moveit_msgs::msg::MoveItErrorCodes error_code;
     if (!generateJointTrajectory(planning_scene_, planner_limits_.getJointLimitContainer(), cart_traj, planning_group_,
-                                 target_link_, initial_joint_position, initial_joint_velocity, joint_traj, error_code,
-                                 true))
+                                 target_link_, initial_joint_position, initial_joint_velocity, duration_last_sample,
+                                 joint_traj, error_code, true))
     {
       std::runtime_error("Failed to generate trajectory.");
     }
