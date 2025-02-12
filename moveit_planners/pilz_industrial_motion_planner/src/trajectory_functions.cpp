@@ -219,41 +219,65 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
                                                           const interpolation::Params& interpolation_params,
                                                           std::vector<double>& time_samples, double time_step)
 {
+  time_samples.clear();
+
   // auto start_time = std::chrono::high_resolution_clock::now();
   double t = 0;
   double last_time = 0.0;
   double traj_duration = trajectory.Duration();
 
+  if (traj_duration <= 1e-06)
+  {
+    time_samples.push_back(0.0);
+    return;
+  }
+
   // Get the initial position
   KDL::Frame prev_frame, current_frame = trajectory.Pos(t);
   KDL::Frame last_frame = trajectory.Pos(traj_duration);
 
+  // Compute the total translation and rotation distance
   double total_translation_distance = (last_frame.p - current_frame.p).Norm();
   double total_rotation_distance = (last_frame.M * current_frame.M.Inverse()).GetRot().Norm();
 
-  std::cout << traj_duration << " " << total_translation_distance << " " << total_rotation_distance << std::endl;
-
+  // Compute the number of samples based on the maximum sample time, translation and rotation distance
   int n_sample_duration = std::ceil(traj_duration / interpolation_params.max_sample_time);
   int n_sample_translation =
-      std::ceil(total_translation_distance / (interpolation_params.max_translation_interpolation_distance * 0.95));
+      std::ceil(total_translation_distance / (interpolation_params.max_translation_interpolation_distance));
   int n_sample_rotation =
-      std::ceil(total_rotation_distance / (interpolation_params.max_rotation_interpolation_distance * 0.95));
-  std::cout << traj_duration / interpolation_params.max_sample_time << std::endl;
-  std::cout << n_sample_duration << " " << n_sample_translation << " " << n_sample_rotation << std::endl;
+      std::ceil(total_rotation_distance / (interpolation_params.max_rotation_interpolation_distance));
+
+  // Get the maximum number of samples
   int n_samples = std::max({ n_sample_duration, n_sample_translation, n_sample_rotation });
 
-  double translation_distance_from_previous, rotation_distance_from_previous;
-  double translation_distance_from_next, rotation_distance_from_next;
+  // Compute the target translation and rotation distance based on the number of samples
   double target_translation_distance = total_translation_distance / n_samples;
   double target_rotation_distance = total_rotation_distance / n_samples;
   double target_max_sample_time = traj_duration / n_samples;
 
-  std::cout << "target translation distance: " << target_translation_distance << std::endl;
-  std::cout << "target rotation distance: " << target_rotation_distance << std::endl;
-  std::cout << "max sample time: " << target_max_sample_time << std::endl;
-  std::cout << "max sampling time: " << interpolation_params.max_sample_time << std::endl;
+  if (target_translation_distance < interpolation_params.min_translation_interpolation_distance)
+  {
+    if (total_translation_distance < interpolation_params.min_translation_interpolation_distance)
+    {
+      RCLCPP_DEBUG(getLogger(), "Translation distance is too small, set to minimum value to ensure no numerical errors.");
+      target_translation_distance = 1e-06;
+    }
+  }
+  if (target_rotation_distance < interpolation_params.min_rotation_interpolation_distance &&
+      total_rotation_distance < interpolation_params.min_rotation_interpolation_distance)
+  {
+    RCLCPP_DEBUG(getLogger(), "Rotation distance is too small, set to minimum value to ensure no numerical errors.");
+    target_rotation_distance = 1e-06;
+  }
 
-  time_samples.clear();
+  RCLCPP_DEBUG_STREAM(getLogger(), "target translation distance: "
+                                       << target_translation_distance << ", target rotation distance: "
+                                       << target_rotation_distance << ", max sample time: " << target_max_sample_time
+                                       << ", max sampling time: " << interpolation_params.max_sample_time);
+
+  double translation_distance_from_previous, rotation_distance_from_previous;
+  double translation_distance_from_next, rotation_distance_from_next;
+  time_samples.push_back(0.0);
   while (t + time_step < traj_duration)
   {
     // Increment the time by the time step
@@ -266,8 +290,8 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
     translation_distance_from_previous = (current_frame.p - prev_frame.p).Norm();
     rotation_distance_from_previous = (prev_frame.M * current_frame.M.Inverse()).GetRot().Norm();
 
-    if (translation_distance_from_previous < interpolation_params.min_translation_interpolation_distance + 2e-6 &&
-        rotation_distance_from_previous < interpolation_params.min_rotation_interpolation_distance + 2e-6)
+    if (translation_distance_from_previous < interpolation_params.min_translation_interpolation_distance &&
+        rotation_distance_from_previous < interpolation_params.min_rotation_interpolation_distance)
     {
       continue;
     }
@@ -282,7 +306,6 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
         rotation_distance_from_next > interpolation_params.max_rotation_interpolation_distance)
     {
       time_samples.push_back(t);  // Store the time
-
       last_time = t;
       prev_frame = current_frame;
     }
@@ -292,9 +315,6 @@ void pilz_industrial_motion_planner::compute_time_samples(const KDL::Trajectory&
   {
     time_samples.push_back(traj_duration);
   }
-  std::cout << time_samples[time_samples.size() - 1] << std::endl;
-  std::cout << time_samples[time_samples.size() - 2] << std::endl;
-
   // std::chrono::duration<double, std::milli> execution_time = std::chrono::high_resolution_clock::now() - start_time;
 }
 
@@ -365,6 +385,8 @@ bool pilz_industrial_motion_planner::generateJointTrajectory(
         !verifySampleJointLimits(ik_solution_last, joint_velocity_last, ik_solution, duration_last_sample,
                                  duration_current_sample, joint_limits))
     {
+      std::cout << "Duration current sample: " << duration_current_sample << std::endl;
+      std::cout << "Duration last sample: " << duration_last_sample << std::endl;
       RCLCPP_ERROR_STREAM(getLogger(), "Inverse kinematics solution at "
                                            << *time_iter
                                            << "s violates the joint velocity/acceleration/deceleration limits.");
