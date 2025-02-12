@@ -217,16 +217,17 @@ void pilz_industrial_motion_planner::interpolate(const Eigen::Isometry3d& start_
 
 bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& trajectory,
                                                         const interpolation::Params& interpolation_params,
-                                                        std::vector<double>& time_samples, double time_step)
+                                                        std::vector<double>& time_samples)
 {
+  const double epsilon = 10e-6;
   time_samples.clear();
 
   // auto start_time = std::chrono::high_resolution_clock::now();
   double t = 0;
-  double last_time = 0.0;
+  double prev_time = 0.0;
   double traj_duration = trajectory.Duration();
 
-  if (traj_duration <= 1e-06)
+  if (traj_duration <= epsilon)
   {
     time_samples.push_back(0.0);
     return true;
@@ -239,6 +240,15 @@ bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& t
   // Compute the total translation and rotation distance
   double total_translation_distance = (last_frame.p - current_frame.p).Norm();
   double total_rotation_distance = (last_frame.M * current_frame.M.Inverse()).GetRot().Norm();
+
+  bool has_translation = total_translation_distance > interpolation_params.min_translation_interpolation_distance;
+  bool has_rotation = total_rotation_distance > interpolation_params.min_rotation_interpolation_distance;
+
+  if (!has_translation && !has_rotation)
+  {
+    RCLCPP_ERROR(getLogger(), "Total translation and rotation distance are too small.");
+    return false;
+  }
 
   // Compute the number of samples based on the maximum sample time, translation and rotation distance
   int n_sample_duration = std::ceil(traj_duration / interpolation_params.max_sample_time);
@@ -255,20 +265,26 @@ bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& t
   double target_rotation_distance = total_rotation_distance / n_samples;
   double target_max_sample_time = traj_duration / n_samples;
 
-  if (target_translation_distance < interpolation_params.min_translation_interpolation_distance)
+  if (target_translation_distance < interpolation_params.min_translation_interpolation_distance &&
+      target_rotation_distance < interpolation_params.min_rotation_interpolation_distance)
   {
-    if (total_translation_distance < interpolation_params.min_translation_interpolation_distance)
-    {
-      RCLCPP_DEBUG(getLogger(),
-                   "Translation distance is too small, set to minimum value to ensure no numerical errors.");
-      target_translation_distance = 1e-06;
-    }
+    double min_feasible_max_sample_time = traj_duration / std::max(n_sample_translation, n_sample_rotation);
+    RCLCPP_ERROR_STREAM(getLogger(),
+                        "Translation and rotation distance are too small. The provided sampling time is too "
+                        "small min value is "
+                            << min_feasible_max_sample_time);
+    return false;
   }
-  if (target_rotation_distance < interpolation_params.min_rotation_interpolation_distance &&
-      total_rotation_distance < interpolation_params.min_rotation_interpolation_distance)
+
+  if (target_translation_distance < interpolation_params.min_translation_interpolation_distance && !has_translation)
+  {
+    RCLCPP_DEBUG(getLogger(), "Translation distance is too small, set to minimum value to ensure no numerical errors.");
+    target_translation_distance = epsilon;
+  }
+  if (target_rotation_distance < interpolation_params.min_rotation_interpolation_distance && !has_rotation)
   {
     RCLCPP_DEBUG(getLogger(), "Rotation distance is too small, set to minimum value to ensure no numerical errors.");
-    target_rotation_distance = 1e-06;
+    target_rotation_distance = epsilon;
   }
 
   RCLCPP_DEBUG_STREAM(getLogger(), "target translation distance: "
@@ -278,6 +294,9 @@ bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& t
 
   double translation_distance_from_previous, rotation_distance_from_previous;
   double translation_distance_from_next, rotation_distance_from_next;
+  double translation_distance_from_last, rotation_distance_from_last;
+  // Set the time_step to a fraction of the interpolation adjusted max sample time
+  double time_step = std::max(std::min(0.001, target_max_sample_time / 10), epsilon);
   time_samples.push_back(0.0);
   while (t + time_step < traj_duration)
   {
@@ -302,12 +321,22 @@ bool pilz_industrial_motion_planner::computeTimeSamples(const KDL::Trajectory& t
     rotation_distance_from_next = (prev_frame.M * next_frame.M.Inverse()).GetRot().Norm();
 
     if (translation_distance_from_previous >= target_translation_distance ||
-        rotation_distance_from_previous >= target_rotation_distance || (t - last_time) >= target_max_sample_time ||
+        rotation_distance_from_previous >= target_rotation_distance || (t - prev_time) >= target_max_sample_time ||
         translation_distance_from_next > interpolation_params.max_translation_interpolation_distance ||
         rotation_distance_from_next > interpolation_params.max_rotation_interpolation_distance)
     {
+      translation_distance_from_last = (current_frame.p - last_frame.p).Norm();
+      rotation_distance_from_last = (last_frame.M * current_frame.M.Inverse()).GetRot().Norm();
+      // Ensures last point is valid
+      if ((has_translation &&
+           translation_distance_from_last < interpolation_params.min_translation_interpolation_distance) &&
+          (has_rotation && rotation_distance_from_last < interpolation_params.min_rotation_interpolation_distance))
+      {
+        break;
+      }
+
       time_samples.push_back(t);  // Store the time
-      last_time = t;
+      prev_time = t;
       prev_frame = current_frame;
     }
   }
