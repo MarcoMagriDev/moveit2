@@ -662,7 +662,6 @@ TEST_F(TrajectoryBlenderTransitionWindowTest, testNonLinearBlending)
       geometry_msgs::msg::Pose waypoint_pose = tf2::toMsg(eigen_pose);
 
       // add scaled sine function
-      // This is causing the test to fail for high accelerations
       waypoint_pose.position.x += sine_scaling_factor * sin(sine_arg);
       waypoint_pose.position.y += sine_scaling_factor * sin(sine_arg);
       waypoint_pose.position.z += sine_scaling_factor * sin(sine_arg);

@@ -354,7 +354,7 @@ bool pilz_industrial_motion_planner::generateJointTrajectory(
     const planning_scene::PlanningSceneConstPtr& scene,
     const pilz_industrial_motion_planner::JointLimitsContainer& joint_limits, const KDL::Trajectory& trajectory,
     const std::string& group_name, const std::string& link_name,
-    const std::map<std::string, double>& initial_joint_position, std::vector<double> time_samples,
+    const std::map<std::string, double>& initial_joint_position, const std::vector<double>& time_samples,
     trajectory_msgs::msg::JointTrajectory& joint_trajectory, moveit_msgs::msg::MoveItErrorCodes& error_code,
     bool check_self_collision)
 {
@@ -366,7 +366,6 @@ bool pilz_industrial_motion_planner::generateJointTrajectory(
 
   // sample the trajectory and solve the inverse kinematics
   Eigen::Isometry3d pose_sample;
-  Eigen::Isometry3d pose_sample_last;
   std::map<std::string, double> ik_solution_last, ik_solution, joint_velocity_last;
   ik_solution_last = initial_joint_position;
   for (const auto& item : ik_solution_last)
@@ -388,17 +387,7 @@ bool pilz_industrial_motion_planner::generateJointTrajectory(
       joint_trajectory.points.clear();
       return false;
     }
-    // if (time_iter != time_samples.begin() && time_samples.size() > 1)
-    // {
-    //   // Compute the forward kinematics of the IK solution to check the error
-    //   double position_error = (pose_sample_last.translation() - pose_sample.translation()).norm();
-    //   double orientation_error =
-    //       Eigen::AngleAxisd(pose_sample_last.rotation().transpose() * pose_sample.rotation()).angle();
 
-    //   std::cout << "IK solution error - Position error: " << position_error
-    //             << ", Orientation error: " << orientation_error << std::endl;
-    // }
-    // pose_sample_last = pose_sample;
     if (time_iter != time_samples.begin())
     {
       duration_current_sample = *time_iter - *(time_iter - 1);
